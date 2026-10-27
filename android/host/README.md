@@ -1,0 +1,15 @@
+# Android host prototype
+
+This is a UI component prototype, not a game runtime or an APK template. No JNI, RGSS interpreter, game loader, audio, rendering backend, or save system is connected. `HostPreviewActivity` explicitly displays that the runtime is missing.
+
+`GameHostView` owns a letterboxed `SurfaceView`. A future runtime may register a `SurfaceHolder.Callback` through `getGameSurface()` and receive button press/release events through `setInputListener()`. Pressed inputs are released on focus loss, pause, detachment, or listener replacement. No key mappings, renderer synchronization, or lifecycle JNI contract are claimed yet.
+
+`TouchInputState` is a separate, thread-safe, platform-independent state prototype. Connect the host listener's `onInput`, `onTouchCancelled` and `onAllTouchesCancelled` callbacks to `setTouch`, `cancelTouch` and `clearTouches`, respectively; call `update` once per RGSS `Input.update`, then query its snapshot from the game thread. Up/down/left/right map to RGSS 8/2/4/6 and confirm/cancel to C=13/B=12. The snapshot matches Lunetile XP's trigger, repeat and opposing-direction rules for timing scale 1 and its 120 Hz mode scale 3. It is not connected to Ruby or JNI.
+
+The controls use space below the game in portrait and, when sufficiently large, the side margins in landscape; otherwise they overlay the game. On the read-only Android 36.1 x86_64 emulator, the portrait Surface bounds were `[0,84][1080,894]` and all six buttons began below y=894. In landscape the Surface was `[480,0][1920,1080]`, with all buttons in the side margins. A confirm tap produced press and release callbacks; holding it while switching Home produced a release callback. Rotation settings were restored after the check. A UI-only screenshot is under `build/android-host-layout-proof/portrait.png`.
+
+This does not prove rendering or game input works. Real-device touch, multi-touch, screen readers, display cutouts, save state and runtime surface recreation still require validation before integration.
+
+`GameAudio` is an Android MediaPlayer prototype supporting WAV, OGG and SMF type 0/1 MIDI. It exposes BGM and BGS looping, overlapping SE, ME with BGM pause/resume, volume and requested pitch; see `android/audio` for the separately tested Ruby/JNI adapter. The test-only `AudioProbeActivity` plays short synthetic fixtures and reports status via logcat. Two read-only Android 36.1 x86_64 emulator instances confirmed WAV BGM and OGG BGS start/stop, WAV SE completion, OGG ME completion, BGM pause/resume, and corrupt/missing file errors. Nondefault 150% SE and 75% ME requests completed, but their actual pitch and timing were not measured. Looping MediaPlayer positions repeatedly reported zero after the first boundary even with emulator audio enabled, so seamless looping, ongoing playback and audible output remain unverified. WMA, MP3 and physical-device audio are not supported or proven.
+
+`ViewportTest` is a JVM-only geometry check. Compile the sources against the installed Android SDK's `android.jar`; this does not establish that an Android app or runtime works.

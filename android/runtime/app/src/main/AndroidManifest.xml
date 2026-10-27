@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="Lunetile XP (Test)" android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity android:name="org.lunetile.host.LauncherActivity" android:exported="true" android:launchMode="singleTask" android:screenOrientation="sensorLandscape">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name="org.lunetile.host.GameActivity" android:exported="false" android:process=":game" android:launchMode="singleTask" android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|locale|layoutDirection|fontScale|density|uiMode|touchscreen" />
+    </application>
+</manifest>

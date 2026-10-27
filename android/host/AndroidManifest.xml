@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.lunetile.host.preview">
+    <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="36" />
+    <application android:label="Lunetile Host Preview (No Game)" android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity android:name="org.lunetile.host.AudioProbeActivity" android:exported="false" />
+        <activity android:name="org.lunetile.host.HostPreviewActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -1,0 +1,41 @@
+plugins { id 'com.android.application' }
+
+def rubyRoot = System.getenv('LUNETILE_ANDROID_RUBY_ROOT')
+if (!rubyRoot) throw new GradleException('Set LUNETILE_ANDROID_RUBY_ROOT to the verified Android ARM64 Ruby build directory')
+def ruby = file(rubyRoot)
+if (!new File(ruby, 'build/libruby-static.a').isFile()) throw new GradleException('Android ARM64 Ruby static library is missing')
+def cmakePath = { File path -> path.absolutePath.replace('\\', '/') }
+def packageId = providers.gradleProperty('lunetileApplicationId').orNull
+if (!packageId || packageId.length() > 255 || !(packageId ==~ /[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+/)) {
+    throw new GradleException('Set a valid lunetileApplicationId through the Android builder')
+}
+
+android {
+    namespace 'org.lunetile.game'
+    compileSdk 36
+    ndkVersion '28.2.13676358'
+    defaultConfig {
+        applicationId packageId
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName '0.1-debug'
+        ndk { abiFilters 'arm64-v8a' }
+        externalNativeBuild {
+            cmake {
+                targets 'lunetile_game'
+                arguments "-DRUBY_SOURCE_DIR=${cmakePath(new File(ruby, 'source'))}",
+                          "-DRUBY_BUILD_DIR=${cmakePath(new File(ruby, 'build'))}",
+                          "-DRUBY_LIBRARY=${cmakePath(new File(ruby, 'build/libruby-static.a'))}"
+            }
+        }
+    }
+    externalNativeBuild { cmake { path file('../CMakeLists.txt'); version '3.22.1' } }
+    sourceSets {
+        main {
+            java.srcDirs = ['../../app/java', '../../core/java', '../java', '../../host/src', '../../audio/java']
+            java.exclude '**/HostPreviewActivity.java', '**/AudioProbeActivity.java'
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+}
