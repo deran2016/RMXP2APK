@@ -16,6 +16,7 @@ std::unique_ptr<lunetile::Raster> frame, group, frozen, transitioned;
 const lunetile::Raster* last_output = nullptr;
 long frame_count = 0;
 int frame_rate = 40;
+bool stock120 = false;
 std::chrono::steady_clock::time_point deadline;
 struct Clip { int x, y, w, h; };
 VALUE error_class() { return rb_const_get(rb_cObject, rb_intern("RGSSError")); }
@@ -151,9 +152,9 @@ VALUE begin_frame(VALUE) {
 VALUE tick(VALUE) {
     ++frame_count;
     auto now = std::chrono::steady_clock::now();
-    deadline += std::chrono::microseconds(1000000 / frame_rate);
+    deadline += std::chrono::nanoseconds(1000000000LL / frame_rate);
     if (deadline > now) std::this_thread::sleep_until(deadline);
-    else deadline = now;
+    else if (!stock120 || now - deadline > std::chrono::milliseconds(250)) deadline = now;
     return Qnil;
 }
 VALUE freeze_frame(VALUE) {
@@ -180,18 +181,21 @@ VALUE output_pixel(VALUE, VALUE x, VALUE y) {
 }
 VALUE set_count(VALUE, VALUE n) { frame_count = NUM2LONG(n); return n; }
 VALUE rate(VALUE) { return INT2NUM(frame_rate); }
-VALUE set_rate(VALUE, VALUE n) { int r = NUM2INT(n); if (r < 1 || r > 120) rb_raise(rb_eArgError, "frame rate must be 1..120"); frame_rate = r; deadline = {}; return n; }
+VALUE set_rate(VALUE, VALUE n) { int r = NUM2INT(n); if (stock120 && r != 120) rb_raise(rb_eArgError, "120 Hz timing requires frame_rate 120"); if (r < 1 || r > 120) rb_raise(rb_eArgError, "frame rate must be 1..120"); frame_rate = r; deadline = {}; return n; }
 VALUE reset(VALUE) { deadline = {}; return Qnil; }
-VALUE yes(VALUE) { return Qtrue; }
-VALUE no(VALUE) { return Qfalse; }
+VALUE should_render(VALUE) {
+    if (!stock120 || deadline == std::chrono::steady_clock::time_point{}) return Qtrue;
+    return std::chrono::steady_clock::now() - deadline < std::chrono::nanoseconds(1000000000LL / 120) ? Qtrue : Qfalse;
+}
+VALUE high(VALUE) { return stock120 ? Qtrue : Qfalse; }
 }
 void lunetile_graphics_set_wait_handler(bool (*handler)()) { wait_handler = handler; }
-void lunetile_init_graphics(LunetileSurface* surface, int width_value, int height_value) {
+void lunetile_init_graphics(LunetileSurface* surface, int width_value, int height_value, bool high_refresh) {
     frame = std::make_unique<lunetile::Raster>(width_value, height_value);
     group = std::make_unique<lunetile::Raster>(width_value, height_value);
     transitioned = std::make_unique<lunetile::Raster>(width_value, height_value);
     last_output = frame.get();
-    frozen.reset(); frame_count = 0; frame_rate = 40; deadline = {}; output = surface;
+    frozen.reset(); frame_count = 0; stock120 = high_refresh; frame_rate = high_refresh ? 120 : 40; deadline = {}; output = surface;
     VALUE graphics = rb_define_module("Graphics");
     rb_define_singleton_method(graphics, "__present", RUBY_METHOD_FUNC(present), 4);
     rb_define_singleton_method(graphics, "__begin", RUBY_METHOD_FUNC(begin_frame), 0);
@@ -206,6 +210,6 @@ void lunetile_init_graphics(LunetileSurface* surface, int width_value, int heigh
     rb_define_singleton_method(graphics, "frame_rate", RUBY_METHOD_FUNC(rate), 0);
     rb_define_singleton_method(graphics, "frame_rate=", RUBY_METHOD_FUNC(set_rate), 1);
     rb_define_singleton_method(graphics, "frame_reset", RUBY_METHOD_FUNC(reset), 0);
-    rb_define_singleton_method(graphics, "__should_render", RUBY_METHOD_FUNC(yes), 0);
-    rb_define_singleton_method(graphics, "__stock120", RUBY_METHOD_FUNC(no), 0);
+    rb_define_singleton_method(graphics, "__should_render", RUBY_METHOD_FUNC(should_render), 0);
+    rb_define_singleton_method(graphics, "__stock120", RUBY_METHOD_FUNC(high), 0);
 }

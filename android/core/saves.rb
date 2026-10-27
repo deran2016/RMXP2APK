@@ -6,8 +6,12 @@ module RGSSXP::Saves
     RGSSXP::APP_FILES_DIR.start_with?('/') && File.directory?(RGSSXP::APP_FILES_DIR)
   ROOT = File.join(File.expand_path(RGSSXP::APP_FILES_DIR), 'Saves', 'RGSSXP').freeze
 
+  def self.high_timing?
+    defined?(RGSSXP::Timing) && RGSSXP::Timing.scale == 3
+  end
+
   class ReadStream < StringIO
-    attr_reader :timing_rate
+    attr_accessor :timing_rate
     def initialize(bytes, modified)
       super(bytes, 'rb')
       @modified = modified
@@ -43,16 +47,18 @@ module RGSSXP::Saves
     path = validate_path(path)
     raise IOError, 'Save exceeds 64 MiB' if File.size(path) > LIMIT
     bytes = File.binread(path)
-    raise IOError, '120Hz Lunetile saves are not supported by the Android data core' if bytes.start_with?(HIGH_MAGIC)
-    raise IOError, 'Unsupported RGSSXP save header or version' unless bytes.start_with?(MAGIC)
+    header = bytes.byteslice(0, MAGIC.bytesize)
+    raise IOError, '120Hz save requires 120Hz timing' if header == HIGH_MAGIC && !high_timing?
+    raise IOError, 'Unsupported RGSSXP save header or version' unless [MAGIC, HIGH_MAGIC].include?(header)
     stream = ReadStream.new(bytes, File.mtime(path))
+    stream.timing_rate = 120 if header == HIGH_MAGIC
     stream.pos = MAGIC.bytesize
     stream
   end
 
   def self.valid_save!(bytes)
     raise IOError, 'Save exceeds 64 MiB' if bytes.bytesize > LIMIT
-    raise IOError, 'Unsupported RGSSXP save header or version' unless bytes.start_with?(MAGIC)
+    raise IOError, 'Unsupported RGSSXP save header or version' unless [MAGIC, HIGH_MAGIC].include?(bytes.byteslice(0, MAGIC.bytesize))
     stream = StringIO.new(bytes, 'rb')
     stream.pos = MAGIC.bytesize
     count = 0
@@ -84,9 +90,12 @@ module RGSSXP::Saves
 
   def self.write(path)
     path = validate_path(path)
+    if !high_timing? && File.file?(path) && File.binread(path, MAGIC.bytesize) == HIGH_MAGIC
+      raise IOError, 'Cannot overwrite a 120Hz save in 40Hz mode'
+    end
     stream = StringIO.new(''.b)
     begin
-      stream.write(MAGIC)
+      stream.write(high_timing? ? HIGH_MAGIC : MAGIC)
       yield stream
       bytes = stream.string
       valid_save!(bytes)

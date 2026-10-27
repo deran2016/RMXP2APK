@@ -50,7 +50,8 @@ public final class GameActivity extends Activity {
                 JSONObject metadata = new JSONObject(new String(Files.readAllBytes(new File(root, "android-build.json").toPath()), StandardCharsets.UTF_8));
                 String encoding = metadata.getString("data_encoding");
                 String scripts = GameAssets.scriptsPath(root);
-                runOnUiThread(() -> start(root, encoding, scripts));
+                boolean highRefresh = metadata.optBoolean("high_refresh", false);
+                runOnUiThread(() -> start(root, encoding, scripts, highRefresh));
             } catch (Exception error) { report(error.toString()); }
         }, "LunetileAssets");
         assetWorker.start();
@@ -68,14 +69,19 @@ public final class GameActivity extends Activity {
         if (!destroyed && sessionLock != null && sessionLock.isValid()) acknowledge(intent);
     }
 
-    private void start(File root, String encoding, String scripts) {
+    private void start(File root, String encoding, String scripts, boolean highRefresh) {
         if (destroyed) return;
+        if (highRefresh) {
+            android.view.WindowManager.LayoutParams attributes = getWindow().getAttributes();
+            attributes.preferredRefreshRate = 120f;
+            getWindow().setAttributes(attributes);
+        }
         AudioBridge audio = null;
         NativeGameEngine engine = null;
         try {
             TouchInputState input = new TouchInputState();
             audio = new AudioBridge(root);
-            engine = new NativeGameEngine(BitmapCodec.class, input, audio, root.getAbsolutePath(), getFilesDir().getAbsolutePath(), encoding, scripts, 640, 480, resumed, this::report);
+            engine = new NativeGameEngine(BitmapCodec.class, input, audio, root.getAbsolutePath(), getFilesDir().getAbsolutePath(), encoding, scripts, 640, 480, highRefresh, resumed, this::report);
             status.setText("");
             session = new GameSession(view, input, audio, engine);
             if (resumed) session.resume();

@@ -65,6 +65,7 @@ struct Boot {
     jobject audio;
     const std::string *root, *saves, *encoding, *scripts;
     int width, height;
+    bool high_refresh;
 };
 VALUE boot(VALUE arg) {
     auto* b = reinterpret_cast<Boot*>(arg);
@@ -72,9 +73,9 @@ VALUE boot(VALUE arg) {
     lunetile_android_init_project(rb_utf8_str_new(b->root->data(), long(b->root->size())));
     lunetile_android_init_saves(rb_utf8_str_new(b->saves->data(), long(b->saves->size())));
     lunetile_init_bitmap();
-    lunetile_init_graphics(&surface, b->width, b->height);
+    lunetile_init_graphics(&surface, b->width, b->height, b->high_refresh);
     lunetile_graphics_set_wait_handler(wait_for_frame);
-    if (!lunetile_input_register(b->env, b->input, 1)) {
+    if (!lunetile_input_register(b->env, b->input, b->high_refresh ? 3 : 1)) {
         if (b->env->ExceptionCheck()) b->env->ExceptionClear();
         rb_raise(rb_eRuntimeError, "Cannot bind Android input");
     }
@@ -118,7 +119,7 @@ Java_org_lunetile_host_NativeGameEngine_nativeStop(JNIEnv*, jclass) {
 extern "C" JNIEXPORT jstring JNICALL
 Java_org_lunetile_host_NativeGameEngine_nativeRun(JNIEnv* env, jclass, jclass codec, jobject input, jobject audio,
                                                   jstring root, jstring saves, jstring encoding, jstring scripts,
-                                                  jint width, jint height) {
+                                                  jint width, jint height, jboolean high_refresh) {
     {
         std::lock_guard<std::mutex> lock(state_mutex);
         if (started) return java_string(env, "Ruby can be started only once per process");
@@ -143,7 +144,7 @@ Java_org_lunetile_host_NativeGameEngine_nativeRun(JNIEnv* env, jclass, jclass co
         if (ruby_setup() != 0) throw std::runtime_error("ruby_setup failed");
         initialized = true;
         if (ruby_probe_init_builtins()) throw std::runtime_error("Ruby builtin initialization failed");
-        Boot context{env, input, audio, &root_value, &saves_value, &encoding_value, &scripts_value, width, height};
+        Boot context{env, input, audio, &root_value, &saves_value, &encoding_value, &scripts_value, width, height, high_refresh == JNI_TRUE};
         rb_protect(boot, reinterpret_cast<VALUE>(&context), &status);
         if (status) {
             bool stopped;

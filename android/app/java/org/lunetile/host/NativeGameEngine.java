@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 public final class NativeGameEngine implements GameSession.Engine {
     public interface ExitListener { void onExit(String error); }
     static { System.loadLibrary("lunetile_game"); }
-    private static native String nativeRun(Class<?> codec, TouchInputState input, AudioBridge audio, String gameRoot, String savesRoot, String encoding, String scriptsPath, int width, int height);
+    private static native String nativeRun(Class<?> codec, TouchInputState input, AudioBridge audio, String gameRoot, String savesRoot, String encoding, String scriptsPath, int width, int height, boolean highRefresh);
     private static native boolean nativeSurface(Surface surface);
     private static native void nativePause(boolean paused);
     private static native void nativeStop();
@@ -22,13 +22,13 @@ public final class NativeGameEngine implements GameSession.Engine {
     private volatile boolean closed;
 
     public NativeGameEngine(Class<?> codec, TouchInputState input, AudioBridge audio, String gameRoot, String savesRoot,
-                            String encoding, String scriptsPath, int width, int height, boolean initiallyResumed, ExitListener listener) {
+                            String encoding, String scriptsPath, int width, int height, boolean highRefresh, boolean initiallyResumed, ExitListener listener) {
         if (listener == null) throw new IllegalArgumentException("Exit listener is required");
         this.listener = listener;
         nativePause(!initiallyResumed);
         worker = new Thread(() -> {
             String error;
-            try { error = nativeRun(codec, input, audio, gameRoot, savesRoot, encoding, scriptsPath, width, height); }
+            try { error = nativeRun(codec, input, audio, gameRoot, savesRoot, encoding, scriptsPath, width, height, highRefresh); }
             catch (Throwable failure) { error = failure.toString(); }
             listener.onExit(error);
         }, "LunetileRuby");

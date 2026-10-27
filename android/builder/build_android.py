@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from migrate_project import MigrationError, RULES, inspect_data, read_project_ini
 from rxdata import read, write
+from high_refresh import adapt as adapt_high_refresh
 
 RUNTIME = ROOT / 'android' / 'runtime'
 REQUIRED_DATA = ('Actors', 'Animations', 'Armors', 'Classes', 'CommonEvents',
@@ -94,6 +95,31 @@ def migrate_saves(raw, encoding):
     missing = set(SAVE_NAMES) - seen
     if missing:
         raise BuildError('Missing reviewed stock save scripts: ' + ', '.join(sorted(missing)))
+    return write(entries, replacements)
+
+
+def migrate_high_refresh(raw, encoding):
+    entries = read(raw)
+    stock = json.loads((ROOT / 'src/runtime/stock_scripts.json').read_text(encoding='utf-8'))['scripts']
+    if len(entries) != len(stock):
+        raise BuildError('120 FPS requires the complete reviewed stock XP scripts')
+    for index, (entry, expected) in enumerate(zip(entries, stock)):
+        name = entry.name.decode(encoding)
+        text = entry.source().decode(encoding)
+        if name != expected['name'] or hashlib.sha256(text.encode('utf-8')).hexdigest() != expected['source_sha256']:
+            raise BuildError(f'120 FPS requires reviewed stock scripts; script {index} ({name}) differs')
+    entries = read(migrate_saves(raw, encoding))
+    replacements = {}
+    helper = (RUNTIME / 'lunetile' / 'stock_timing.rb').read_text(encoding='utf-8')
+    for index, entry in enumerate(entries):
+        name = entry.name.decode(encoding)
+        text = entry.source().decode(encoding)
+        adapted, changes = adapt_high_refresh(name, text.replace('\r\n', '\n'))
+        if name == 'Main':
+            adapted = helper + '\n' + adapted
+            changes.append(True)
+        if changes:
+            replacements[index] = adapted.encode(encoding)
     return write(entries, replacements)
 
 
@@ -231,7 +257,7 @@ def validate_resources(source, encoding, stage, ruby, rtp_dir):
             raise BuildError(f'{location}: missing resource {group}/{name}')
 
 
-def build(source, output, ini_encoding=None, data_encoding=None, rtp_dir=None, runtime=RUNTIME, ruby=None, app_id=None):
+def build(source, output, ini_encoding=None, data_encoding=None, rtp_dir=None, runtime=RUNTIME, ruby=None, app_id=None, high_refresh=False):
     source, output, runtime = source.resolve(), output.resolve(), runtime.resolve()
     app_id = application_id(source, app_id)
     rtp_dir = rtp_dir.resolve() if rtp_dir else None
@@ -245,6 +271,8 @@ def build(source, output, ini_encoding=None, data_encoding=None, rtp_dir=None, r
     if output.is_relative_to(source):
         raise BuildError('Output must be outside the original project')
     script_path = inspect_project(source, ini_encoding, data_encoding, rtp_dir)
+    original_scripts = (source / script_path).read_bytes()
+    converted_scripts = migrate_high_refresh(original_scripts, data_encoding) if high_refresh else migrate_saves(original_scripts, data_encoding)
     with tempfile.TemporaryDirectory(prefix='.android-build-', dir=output.parent) as temp:
         stage = Path(temp)
         validate_data(source, data_encoding, stage, ruby)
@@ -264,9 +292,9 @@ def build(source, output, ini_encoding=None, data_encoding=None, rtp_dir=None, r
         for folder in ('Data', 'Graphics', 'Audio'):
             if (source / folder).is_dir():
                 shutil.copytree(source / folder, game / folder, dirs_exist_ok=True)
-        (game / script_path).write_bytes(migrate_saves((source / script_path).read_bytes(), data_encoding))
+        (game / script_path).write_bytes(converted_scripts)
         shutil.copy2(source / 'Game.ini', game / 'Game.ini')
-        (game / 'android-build.json').write_text(json.dumps({'data_encoding': data_encoding, 'ini_encoding': ini_encoding}), encoding='utf-8')
+        (game / 'android-build.json').write_text(json.dumps({'data_encoding': data_encoding, 'ini_encoding': ini_encoding, 'high_refresh': high_refresh}), encoding='utf-8')
         env = os.environ.copy()
         env.setdefault('LUNETILE_ANDROID_RUBY_ROOT', str(ROOT / 'build' / 'android-ruby-arm64-pic'))
         print('Android application ID:', app_id, flush=True)
@@ -311,10 +339,11 @@ def main():
     parser.add_argument('--rtp-dir', type=Path)
     parser.add_argument('--ruby', type=Path, help='Lunetile Ruby 4.0.7 x86 executable used to inspect project data')
     parser.add_argument('--application-id', help='Stable Android package ID; reuse it when moving a project to keep its app and saves')
+    parser.add_argument('--120fps', action='store_true', dest='high_refresh', help='Build reviewed stock XP scripts with 120 Hz timing')
     args = parser.parse_args()
     print('Experimental Android XP build: compatibility is limited to the documented test scope.', flush=True)
     try:
-        result = build(args.project, args.output, args.ini_encoding, args.data_encoding, args.rtp_dir, ruby=args.ruby, app_id=args.application_id)
+        result = build(args.project, args.output, args.ini_encoding, args.data_encoding, args.rtp_dir, ruby=args.ruby, app_id=args.application_id, high_refresh=args.high_refresh)
     except (BuildError, MigrationError, OSError, ValueError, configparser.Error) as error:
         parser.exit(1, f'Android build stopped: {error}\n')
     print(f'Android debug APK: {result}')

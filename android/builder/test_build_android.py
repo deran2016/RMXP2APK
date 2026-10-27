@@ -145,6 +145,23 @@ class AndroidBuilderTests(unittest.TestCase):
         converted = builder.migrate_saves(source.read_bytes(), 'UTF-8')
         self.assertEqual(converted, builder.migrate_saves(converted, 'UTF-8'))
 
+    def test_high_refresh_converts_reviewed_scripts_and_rejects_edits(self):
+        import hashlib
+        from high_refresh import RULES as timing_rules
+        names = ['Game_Character 2', 'Main']
+        sources = ['\n'.join(before for before, _ in timing_rules[names[0]]), '# Main\n']
+        entries = [Entry(i, name.encode(), zlib.compress(text.encode()), b'') for i, (name, text) in enumerate(zip(names, sources))]
+        raw = write(entries, {i: text.encode() for i, text in enumerate(sources)})
+        stock = {'scripts': [{'name': name, 'source_sha256': hashlib.sha256(text.encode()).hexdigest()} for name, text in zip(names, sources)]}
+        with patch.object(builder.json, 'loads', return_value=stock):
+            converted = read(builder.migrate_high_refresh(raw, 'UTF-8'))
+            self.assertEqual([(e.id, e.name) for e in entries], [(e.id, e.name) for e in converted])
+            self.assertIn('Timing.step_distance', converted[0].source().decode())
+            self.assertIn('def self.import_save', converted[1].source().decode())
+            modified = write(read(raw), {0: (sources[0] + '# changed').encode()})
+            with self.assertRaisesRegex(builder.BuildError, 'reviewed stock scripts'):
+                builder.migrate_high_refresh(modified, 'UTF-8')
+
     def test_resource_references_report_the_location(self):
         line = 'Graphics/Characters\t' + '한글'.encode().hex() + '\tActors.rxdata[1].character_name\n'
         result = SimpleNamespace(returncode=0, stdout=line, stderr='')

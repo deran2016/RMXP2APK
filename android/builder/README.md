@@ -13,3 +13,5 @@ The first Android host currently uses XP's 640×480 logical viewport. Projects e
 An extension match and MIDI type 0/1 header check do not establish that the Android runtime will decode or play every file. WMA and MP3 are rejected. MIDI support was checked with a synthetic type 0 fixture; actual playback quality requires device validation.
 
 This is an experimental beta. The builder checks that required runtime sources and build tools exist, but their presence does not certify compatibility with an arbitrary project. `diagnostic_build.py` exercises the same staging and Gradle path using an isolated project copy and names its output as a diagnostic. The Gradle wrapper is pinned to 8.13; this Windows setup used JDK 21, SDK 36, NDK 28.2 and a local SDK aapt2 override.
+
+`--120fps` enables 120 Hz timing for the exact reviewed stock XP script collection. Modified or additional scripts are rejected for this mode. The default remains 40 Hz; real display output depends on device refresh rate and performance. See the root README for the GUI option and save compatibility.

@@ -30,6 +30,10 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(output.read_bytes(), b'existing')
         self.assertEqual((self.project / 'Game.ini').read_text(encoding='utf-8'), '[Game]\n')
 
+    def test_high_refresh_option_is_passed_to_builder(self):
+        command = console_build_command('project', 'output.apk', 'UTF-8', 'UTF-8', '', '', '', True)
+        self.assertIn('--120fps', command)
+
     def test_worker_reports_log_and_success_only_if_apk_exists(self):
         window = object.__new__(BuilderWindow)
         window.messages = queue.Queue()

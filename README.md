@@ -3,7 +3,7 @@
 
 # RMXP2APK
 
-**Lunetile XP 프로젝트를 Android APK로 빌드하는 실험적인 도구**
+**RPG Maker XP 프로젝트를 Android APK로 빌드하는 실험적인 도구**
 
 [![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)](#지원-범위와-제한사항)
 [![Platform: Windows](https://img.shields.io/badge/builder-Windows-0078D4)](#사전-준비)
@@ -15,7 +15,7 @@
 
 ## 소개
 
-RMXP2APK는 Windows에서 Lunetile XP 프로젝트를 Android ARM64용 개발 서명 APK로 빌드합니다. GUI와 명령줄을 제공하며, 게임 원본을 수정하지 않고 새 경로에 결과를 만듭니다.
+RMXP2APK는 Windows에서 원본 RPG Maker XP 프로젝트와 Lunetile XP 프로젝트를 Android ARM64용 개발 서명 APK로 빌드합니다. 원본 RGSS 프로젝트도 아래 검사 조건을 충족하면 입력할 수 있습니다. Android에서는 Windows용 `Game.exe`나 RGSS DLL 대신 Lunetile 기반 Android 런타임이 게임 데이터와 스크립트를 실행합니다. GUI와 명령줄을 제공하며, 게임 원본을 수정하지 않고 새 경로에 결과를 만듭니다.
 
 > **실험적 프로젝트:** 모든 RPG Maker XP 게임이나 사용자 스크립트의 동작을 보장하지 않습니다. 생성된 APK는 Play 스토어용 정식 서명이나 AAB가 아닙니다.
 
@@ -65,7 +65,8 @@ pythonw android/builder/gui.py
 
 1. `Game.ini`가 있는 XP 프로젝트와 프로젝트 밖의 새 `.apk` 출력 경로를 선택합니다.
 2. 원본에 맞는 Game.ini·데이터 인코딩을 선택합니다. 필요하면 검사기 Ruby와 단일 RTP 폴더를 지정합니다.
-3. **APK 빌드 시작**을 누르고 로그에서 진행 상황과 오류를 확인합니다.
+3. 필요한 경우 **120 FPS**를 선택합니다. 이 옵션은 검토된 기본 XP 스크립트 전체와 일치하는 프로젝트에만 적용됩니다.
+4. **APK 빌드 시작**을 누르고 로그에서 진행 상황과 오류를 확인합니다.
 
 Game.ini에 RTP가 지정되어 있다면 해당 RTP의 `Graphics`와 `Audio`를 포함하는 폴더가 필요합니다. 게임과 RTP 자산을 포함하려면 해당 사용·배포 권한이 있어야 합니다.
 
@@ -83,17 +84,23 @@ python -X utf8 android/builder/build_android.py "C:\MyGame" "C:\Output\MyGame-de
 
 인코딩은 원본에 맞게 `UTF-8`, `CP949`, `CP932` 중 선택합니다. RTP가 없는 프로젝트에서는 `--rtp-dir`을 생략합니다. 원본과 기존 APK는 덮어쓰지 않습니다. 연결된 기기에는 `adb install "C:\Output\MyGame-debug.apk"`로 설치할 수 있습니다.
 
+### 120 FPS 옵션
+
+기본값은 40FPS입니다. GUI의 **120 FPS**를 선택하거나 명령줄에 `--120fps`를 추가하면, 검토된 기본 XP 스크립트의 게임 속도와 타이머를 120Hz에 맞춰 변환하고 Android에 120Hz 화면 주사율을 요청합니다. 스크립트가 검토된 원본과 다르면 안전을 위해 빌드를 중단합니다. 화면·기기 성능, 주사율, 전원 설정에 따라 실제 출력은 120FPS에 도달하지 않을 수 있습니다.
+
+기존 40Hz 앱 저장은 120Hz 모드에서 불러올 때 변환됩니다. 120Hz로 저장한 데이터는 40Hz 모드에서 읽을 수 없으며 해당 슬롯을 덮어쓰지 않습니다. 업데이트 전 저장 데이터를 백업하세요.
+
 ### 앱 ID와 저장 데이터
 
 기본 앱 ID는 프로젝트의 절대 경로를 기반으로 생성되므로 프로젝트를 옮기거나 이름을 바꾸면 달라집니다. 기존 설치와 저장 데이터를 유지하려면 처음 출력된 ID를 기록하고 이후 GUI의 앱 ID 또는 `--application-id org.example.game`에 지정하세요. 업데이트에는 동일한 디버그 서명 키도 필요합니다. 서로 다른 게임에 같은 ID를 지정하면 Android가 같은 앱으로 취급합니다.
 
 ## 지원 범위와 제한사항
 
-- **대상:** Android 8 이상, ARM64, 640×480 및 검토된 기본 XP 스크립트.
-- **지원하지 않음:** 더 큰 해상도, 암호화된 RGSSAD 전용 프로젝트, 다중 RTP, 검토되지 않은 저장 스크립트, Windows DLL·Win32 API, MP3·WMA 및 Lunetile의 Windows 전용 확장 기능.
+- **대상:** Android 8 이상, ARM64, 640×480 및 검토된 기본 XP 스크립트. 원본 RPG Maker XP와 Lunetile XP 프로젝트 모두 입력할 수 있습니다.
+- **지원하지 않음:** 더 큰 해상도, `Game.rgssad`가 있는 프로젝트, 다중 RTP, 검토되지 않은 저장 스크립트, Windows DLL·Win32 API, MP3·WMA 및 Lunetile의 Windows 전용 확장 기능.
 - **리소스와 오디오:** 검사기는 동적으로 구성된 모든 리소스 경로를 확인하지 못합니다. WAV·OGG·MIDI 재생은 Android 기기에 따라 달라질 수 있습니다.
 
-별도의 XP 검증 프로젝트를 Android 에뮬레이터에서 실행해 타이틀, 이동, 이벤트, 전투, 저장과 재실행 후 불러오기를 확인했습니다. 이 결과는 해당 시나리오에 한정되며 모든 게임이나 실기기 전체 동작을 검증한 것은 아닙니다.
+별도의 XP 검증 프로젝트를 Android 에뮬레이터에서 실행해 타이틀, 이동, 이벤트, 전투, 저장과 재실행 후 불러오기를 확인했습니다. 120Hz 옵션도 기본 XP 템플릿을 60Hz Android 에뮬레이터에서 실행하여 타이틀, 맵, 저장과 재실행 후 불러오기를 확인했습니다. 이 결과는 해당 시나리오에 한정되며 실제 120FPS 출력, 모든 게임이나 실기기 전체 동작을 검증한 것은 아닙니다.
 
 ## 개발 및 검증
 

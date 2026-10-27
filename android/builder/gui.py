@@ -56,6 +56,7 @@ class BuilderWindow:
         self.rtp = tk.StringVar()
         self.ruby = tk.StringVar()
         self.application_id = tk.StringVar()
+        self.high_refresh = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value='프로젝트와 APK 저장 위치를 선택하세요.')
         self.messages = queue.Queue()
         self.running = False
@@ -80,7 +81,10 @@ class BuilderWindow:
         entry = ttk.Entry(frame, textvariable=self.application_id)
         entry.grid(row=7, column=1, columnspan=2, sticky='ew', pady=5)
         self.controls.append(entry)
-        ttk.Label(frame, text='비워두면 프로젝트 경로로 ID를 생성합니다. 프로젝트를 옮긴 뒤 기존 세이브를 유지하려면 이전 ID와 서명 키를 사용하세요.', wraplength=800).grid(row=8, column=0, columnspan=3, sticky='w', pady=(0, 8))
+        ttk.Label(frame, text='비워두면 프로젝트 경로로 ID를 생성합니다. 프로젝트를 옮긴 뒤 기존 세이브를 유지하려면 이전 ID와 서명 키를 사용하세요.', wraplength=560).grid(row=8, column=0, columnspan=2, sticky='w', pady=(0, 8))
+        high = ttk.Checkbutton(frame, text='120 FPS (검토된 기본 XP 스크립트만)', variable=self.high_refresh)
+        high.grid(row=8, column=2, sticky='e')
+        self.controls.append(high)
         self.button = ttk.Button(frame, text='APK 빌드 시작', command=self.start)
         self.button.grid(row=9, column=2, sticky='e', pady=5)
         ttk.Label(frame, textvariable=self.status).grid(row=9, column=0, columnspan=2, sticky='w', pady=5)
@@ -151,7 +155,7 @@ class BuilderWindow:
         except (ValueError, OSError) as error:
             messagebox.showerror('입력 확인', str(error), parent=self.root)
             return
-        command = console_build_command(str(source), str(destination), self.data_encoding.get(), self.ini_encoding.get(), self.rtp.get().strip(), self.ruby.get().strip(), self.application_id.get())
+        command = console_build_command(str(source), str(destination), self.data_encoding.get(), self.ini_encoding.get(), self.rtp.get().strip(), self.ruby.get().strip(), self.application_id.get(), self.high_refresh.get())
         self.log.configure(state='normal')
         self.log.delete('1.0', 'end')
         self.log.configure(state='disabled')
